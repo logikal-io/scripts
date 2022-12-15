@@ -1,0 +1,66 @@
+#!/bin/bash
+name="$(basename $0)"
+usage="${name} [-h] profile"
+description="Log in to an AWS named profile."
+options="
+  -h, --help  show help
+  profile     the profile to use"
+
+# Processing command-line arguments
+emph="\e[1;34m"
+reset="\e[0m"
+if [[ $# != 1 ]]; then
+    echo "${name}: error: invalid arguments"
+    echo "usage: ${usage}"
+    exit 1
+fi
+if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+    echo -e "${emph}Usage:${reset} ${usage}\n"
+    echo -e "${description}\n"
+    echo -e "${emph}Options:${reset}${options}"
+    exit
+fi
+profile="$1"
+
+# Logging in
+echo 'Executing "aws sso login"...'
+aws sso login --profile "${profile}" || exit 1
+
+# Populating named profile credentials
+aws_config="$HOME/.aws/config"
+aws_credentials="$HOME/.aws/credentials"
+aws_sso_cache="$HOME/.aws/sso/cache"
+
+echo 'Updating named profile credentials'
+role_name="$(crudini --get "${aws_config}" "profile ${profile}" sso_role_name)"
+account_id="$(crudini --get "${aws_config}" "profile ${profile}" sso_account_id)"
+region="$(crudini --get "${aws_config}" "profile ${profile}" sso_region)"
+
+profile_start_url="$(crudini --get "${aws_config}" "profile ${profile}" sso_start_url)"
+for access_token_file in "${aws_sso_cache}"/*.json; do
+    start_url="$(cat "${access_token_file}" | jq .startUrl -r)"
+    expires_at="$(cat "${access_token_file}" | jq .expiresAt -r)"
+    now="$(date -u '+%FT%TZ')"
+    if [[ "${start_url}" == "${profile_start_url}" && "${expires_at}" > "${now}" ]]; then
+        access_token="$(cat "${access_token_file}" | jq .accessToken -r)"
+        break
+    fi
+done
+if [[ -z ${access_token} || "${access_token}" == "null" ]]; then
+    echo "No cached access token to be found under '${aws_sso_cache}'"
+    exit 1
+fi
+
+credentials="$(aws sso get-role-credentials \
+    --role-name "${role_name}" \
+    --account-id "${account_id}" \
+    --access-token "${access_token}" \
+    --region "${region}" \
+    --profile "${profile}" | jq .roleCredentials
+)"
+crudini --set "${aws_credentials}" "${profile}" 'aws_access_key_id' \
+    "$(echo "${credentials}" | jq .accessKeyId -r)"
+crudini --set "${aws_credentials}" "${profile}" 'aws_secret_access_key' \
+    "$(echo "${credentials}" | jq .secretAccessKey -r)"
+crudini --set "${aws_credentials}" "${profile}" 'aws_session_token' \
+    "$(echo "${credentials}" | jq .sessionToken -r)"
