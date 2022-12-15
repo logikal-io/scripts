@@ -1,2 +1,0 @@
-# scripts
-Common system scripts
