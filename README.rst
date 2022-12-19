@@ -7,9 +7,8 @@ Requirements
 The `Google Cloud Command Line Interface <https://cloud.google.com/cli>`_ needs to be installed for
 the ``gcpl`` script to work.
 
-The `AWS Command Line Interface <https://aws.amazon.com/cli/>`_, `jq
-<https://stedolan.github.io/jq/>`_ and `crudini <https://github.com/pixelb/crudini>`_ needs to be
-installed for the ``awsl`` script to work.
+The `AWS Command Line Interface <https://aws.amazon.com/cli/>`_ and `jq
+<https://stedolan.github.io/jq/>`_ needs to be installed for the ``awsl`` script to work.
 
 Installation
 ------------
